@@ -14,10 +14,6 @@ type Worker interface {
 
 // Sniffer packet sniffer configuration
 type Sniffer struct {
-	pcapHandle *pcap.Handle
-	//	afpacketHandle *afpacketHandle
-	//	pfringHandle   *pfringHandle
-	dumper *pcap.Dumper
 
 	// iface to listen
 	Interface string
@@ -25,30 +21,25 @@ type Sniffer struct {
 	// capture filter
 	Filter string
 
-	//  packet snapshot length
+	// packet snapshot length
 	Snaplen int
-
-	// Decoder    *decoder.DecoderStruct
-	Worker     Worker
-	DataSource gopacket.PacketDataSource
 }
 
 // Init initialize sniffer
-func (sniffer *Sniffer) Init() error {
-	var err error
-	sniffer.pcapHandle, err = pcap.OpenLive(
+func (sniffer *Sniffer) Init() (*pcap.Handle, error) {
+
+	handle, err := pcap.OpenLive(
 		sniffer.Interface,
 		int32(sniffer.Snaplen),
 		true,
 		500*time.Millisecond)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	err = sniffer.pcapHandle.SetBPFFilter(sniffer.Filter)
+	err = handle.SetBPFFilter(sniffer.Filter)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	sniffer.DataSource = gopacket.PacketDataSource(sniffer.pcapHandle)
-	return nil
+	return handle, nil
 }

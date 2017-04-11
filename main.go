@@ -3,12 +3,14 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/tsg/gopacket"
-	"os"
-	"syscall"
-	//	"github.com/tsg/gopacket/layers"
+	"github.com/kofemann/nfstop/nfs"
 	"github.com/kofemann/nfstop/sniffer"
+	"github.com/tsg/gopacket"
+	"github.com/tsg/gopacket/layers"
 	"github.com/tsg/gopacket/pcap"
+	"github.com/tsg/gopacket/tcpassembly"
+	"os"
+	"time"
 )
 
 const (
@@ -22,12 +24,6 @@ const (
 	SNAPLEN = 65535
 )
 
-type NopWorker struct{}
-
-func (w *NopWorker) OnPacket(data []byte, ci *gopacket.CaptureInfo) {
-
-}
-
 var iface = flag.String("i", ANY_DEVICE, "name of `interface` to listen")
 var filter = flag.String("f", NFS_FILTER, "capture `filter` in libpcap filter syntax")
 var listInterfaces = flag.Bool("D", false, "print list of interfaces and exit")
@@ -36,20 +32,6 @@ var snaplen = flag.Int("s", SNAPLEN, "packet `snaplen` - snapshot length")
 func main() {
 
 	flag.Parse()
-
-	sniffer := &sniffer.Sniffer{
-		Interface: *iface,
-		Filter:    *filter,
-		Snaplen:   *snaplen,
-		Worker:    &NopWorker{},
-	}
-	counter := 0
-
-	err := sniffer.Init()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to initialize sniffer: %v\n", err)
-		os.Exit(1)
-	}
 
 	if *listInterfaces {
 		ifaces, err := pcap.FindAllDevs()
@@ -64,30 +46,58 @@ func main() {
 		os.Exit(0)
 	}
 
-	isDone := false
-	for !isDone {
+	sniffer := &sniffer.Sniffer{
+		Interface: *iface,
+		Filter:    *filter,
+		Snaplen:   *snaplen,
+	}
 
-		data, ci, err := sniffer.DataSource.ReadPacketData()
+	handle, err := sniffer.Init()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize sniffer: %v\n", err)
+		os.Exit(1)
+	}
 
-		if err == pcap.NextErrorTimeoutExpired || err == syscall.EINTR {
-			// no packet received
-			continue
+	streamFactory := &nfs.RpcStreamFactory{}
+	streamPool := tcpassembly.NewStreamPool(streamFactory)
+	assembler := tcpassembly.NewAssembler(streamPool)
+
+	// Read in packets, pass to assembler.
+
+	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+	packets := packetSource.Packets()
+	ticker := time.Tick(time.Minute)
+
+	counter := 0
+
+	for {
+		select {
+		case packet := <-packets:
+			// A nil packet indicates the end of a pcap file.
+			if packet == nil {
+				os.Exit(0)
+			}
+			counter++
+			//		log.Println(packet)
+			if packet.NetworkLayer() == nil || packet.TransportLayer() == nil || packet.TransportLayer().LayerType() != layers.LayerTypeTCP {
+
+				continue
+			}
+
+			tcp := packet.TransportLayer().(*layers.TCP)
+			assembler.AssembleWithTimestamp(packet.NetworkLayer().NetworkFlow(), tcp, packet.Metadata().Timestamp)
+
+			fmt.Println(packet.NetworkLayer().NetworkFlow())
+			fmt.Printf("%d %s:%s -> %s:%s\n", counter,
+				packet.NetworkLayer().NetworkFlow().Src(),
+				tcp.TransportFlow().Src(),
+				packet.NetworkLayer().NetworkFlow().Dst(),
+				tcp.TransportFlow().Dst(),
+			)
+
+		case <-ticker:
+			// Every minute, flush connections that haven't seen activity in the past 2 minutes.
+			assembler.FlushOlderThan(time.Now().Add(time.Minute * -2))
 		}
-
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Sniffing error: %s\n", err)
-			isDone = true
-			continue
-		}
-
-		if len(data) == 0 {
-			// Empty packet, probably timeout from afpacket
-			continue
-		}
-
-		counter++
-		fmt.Printf("Packet number: %d\n", counter)
-
-		sniffer.Worker.OnPacket(data, &ci)
 	}
 }
