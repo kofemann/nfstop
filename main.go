@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"github.com/kofemann/nfstop/nfs"
 	"github.com/kofemann/nfstop/sniffer"
+	"github.com/kofemann/nfstop/utils"
+
 	"github.com/tsg/gopacket"
 	"github.com/tsg/gopacket/layers"
 	"github.com/tsg/gopacket/pcap"
@@ -87,7 +89,6 @@ func main() {
 			tcp := packet.TransportLayer().(*layers.TCP)
 			assembler.AssembleWithTimestamp(packet.NetworkLayer().NetworkFlow(), tcp, packet.Metadata().Timestamp)
 
-			fmt.Println(packet.NetworkLayer().NetworkFlow())
 			fmt.Printf("%d %s:%s -> %s:%s\n", counter,
 				packet.NetworkLayer().NetworkFlow().Src(),
 				tcp.TransportFlow().Src(),
@@ -95,6 +96,11 @@ func main() {
 				tcp.TransportFlow().Dst(),
 			)
 
+			data := tcp.Payload
+			if len(data) == 0 {
+				continue
+			}
+			utils.DumpAsHex(data)
 		case <-ticker:
 			// Every minute, flush connections that haven't seen activity in the past 2 minutes.
 			assembler.FlushOlderThan(time.Now().Add(time.Minute * -2))
