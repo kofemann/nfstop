@@ -11,8 +11,13 @@ import (
 	"github.com/tsg/gopacket/pcap"
 )
 
-// ANY_DEVICE peseudo interface to listen all interfaces
-const ANY_DEVICE = "any"
+const (
+	// ANY_DEVICE peseudo interface to listen all interfaces
+	ANY_DEVICE = "any"
+
+	// NFS_FILTER default packet fiter to capture nfs traffic
+	NFS_FILTER = "port 2049"
+)
 
 type NopWorker struct{}
 
@@ -20,8 +25,8 @@ func (w *NopWorker) OnPacket(data []byte, ci *gopacket.CaptureInfo) {
 
 }
 
-var iface = flag.String("i", ANY_DEVICE, "name of interface to listen")
-var filter = flag.String("f", "", "capture filter in libpcap filter syntax")
+var iface = flag.String("i", ANY_DEVICE, "name of `interface` to listen")
+var filter = flag.String("f", NFS_FILTER, "capture `filter` in libpcap filter syntax")
 
 func main() {
 
