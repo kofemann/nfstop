@@ -7,10 +7,6 @@ import (
 	"github.com/tsg/gopacket/pcap"
 )
 
-const (
-	SNAPLEN = 65535
-)
-
 // Worker callback handler
 type Worker interface {
 	OnPacket(data []byte, ci *gopacket.CaptureInfo)
@@ -29,6 +25,9 @@ type Sniffer struct {
 	// capture filter
 	Filter string
 
+	//  packet snapshot length
+	Snaplen int
+
 	// Decoder    *decoder.DecoderStruct
 	Worker     Worker
 	DataSource gopacket.PacketDataSource
@@ -39,7 +38,7 @@ func (sniffer *Sniffer) Init() error {
 	var err error
 	sniffer.pcapHandle, err = pcap.OpenLive(
 		sniffer.Interface,
-		int32(SNAPLEN),
+		int32(sniffer.Snaplen),
 		true,
 		500*time.Millisecond)
 	if err != nil {

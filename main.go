@@ -17,6 +17,9 @@ const (
 
 	// NFS_FILTER default packet fiter to capture nfs traffic
 	NFS_FILTER = "port 2049"
+
+	// SNAPLEN packet snapshot length
+	SNAPLEN = 65535
 )
 
 type NopWorker struct{}
@@ -28,6 +31,7 @@ func (w *NopWorker) OnPacket(data []byte, ci *gopacket.CaptureInfo) {
 var iface = flag.String("i", ANY_DEVICE, "name of `interface` to listen")
 var filter = flag.String("f", NFS_FILTER, "capture `filter` in libpcap filter syntax")
 var listInterfaces = flag.Bool("D", false, "print list of interfaces and exit")
+var snaplen = flag.Int("s", SNAPLEN, "packet `snaplen` - snapshot length")
 
 func main() {
 
@@ -36,6 +40,7 @@ func main() {
 	sniffer := &sniffer.Sniffer{
 		Interface: *iface,
 		Filter:    *filter,
+		Snaplen:   *snaplen,
 		Worker:    &NopWorker{},
 	}
 	counter := 0
