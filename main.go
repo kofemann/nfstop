@@ -3,9 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/kofemann/nfstop/nfs"
 	"github.com/kofemann/nfstop/sniffer"
-	"github.com/kofemann/nfstop/utils"
-
+	"github.com/kofemann/nfstop/stream"
 	"github.com/tsg/gopacket"
 	"github.com/tsg/gopacket/layers"
 	"github.com/tsg/gopacket/pcap"
@@ -22,6 +22,8 @@ const (
 	// SNAPLEN packet snapshot length
 	SNAPLEN = 65535
 )
+
+var streams = make(map[string]*stream.TcpStream)
 
 var iface = flag.String("i", ANY_DEVICE, "name of `interface` to listen")
 var filter = flag.String("f", NFS_FILTER, "capture `filter` in libpcap filter syntax")
@@ -85,14 +87,36 @@ func main() {
 				continue
 			}
 
-			fmt.Printf("%d %s:%s -> %s:%s\n", counter,
+			// direction independed unique connection identifier
+			connectionKey := fmt.Sprintf("%d:%d",
+				packet.NetworkLayer().NetworkFlow().FastHash(),
+				tcp.TransportFlow().FastHash(),
+			)
+
+			fmt.Printf("%s %d %s:%s -> %s:%s\n",
+				packet.Metadata().CaptureInfo.Timestamp,
+				counter,
 				packet.NetworkLayer().NetworkFlow().Src(),
 				tcp.TransportFlow().Src(),
 				packet.NetworkLayer().NetworkFlow().Dst(),
 				tcp.TransportFlow().Dst(),
 			)
 
-			utils.DumpAsHex(data)
+			dir := 0
+			tcpStream, ok := streams[connectionKey]
+			if !ok {
+				tcpStream = stream.NewTcpStream(tcp)
+				streams[connectionKey] = tcpStream
+			} else {
+				if tcpStream.SrcPort != tcp.SrcPort {
+					dir = 1
+				}
+			}
+
+			rawStream := tcpStream.Data[dir]
+			rawStream.Data = append(rawStream.Data, data...)
+
+			nfs.DataArrieved(rawStream)
 		}
 	}
 }
