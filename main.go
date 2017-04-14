@@ -1,6 +1,7 @@
 package main
 
 import (
+	"container/list"
 	"flag"
 	"fmt"
 	"github.com/kofemann/nfstop/nfs"
@@ -10,6 +11,7 @@ import (
 	"github.com/tsg/gopacket/layers"
 	"github.com/tsg/gopacket/pcap"
 	"os"
+	"time"
 )
 
 const (
@@ -21,6 +23,8 @@ const (
 
 	// SNAPLEN packet snapshot length
 	SNAPLEN = 65535
+
+	REFRESH_TIME = time.Second * 2
 )
 
 var streams = make(map[string]*stream.TcpStream)
@@ -65,9 +69,22 @@ func main() {
 	packets := packetSource.Packets()
 
 	counter := 0
+	ticker := time.Tick(REFRESH_TIME)
+
+	collector := list.New()
 
 	for {
 		select {
+		case <-ticker:
+			// time to refresh screen
+			l := collector
+			collector = list.New()
+
+			for e := l.Front(); e != nil; e = e.Next() {
+				r := e.Value.(*nfs.NfsRequest)
+				fmt.Println(r)
+			}
+
 		case packet := <-packets:
 			// A nil packet indicates the end of a pcap file.
 			if packet == nil {
@@ -93,15 +110,6 @@ func main() {
 				tcp.TransportFlow().FastHash(),
 			)
 
-			fmt.Printf("%s %d %s:%s -> %s:%s\n",
-				packet.Metadata().CaptureInfo.Timestamp,
-				counter,
-				packet.NetworkLayer().NetworkFlow().Src(),
-				tcp.TransportFlow().Src(),
-				packet.NetworkLayer().NetworkFlow().Dst(),
-				tcp.TransportFlow().Dst(),
-			)
-
 			dir := 0
 			tcpStream, ok := streams[connectionKey]
 			if !ok {
@@ -113,10 +121,19 @@ func main() {
 				}
 			}
 
+			event := &stream.Event{
+				Timestamp: packet.Metadata().CaptureInfo.Timestamp,
+				Src:       packet.NetworkLayer().NetworkFlow().Src().String(),
+				Dst:       packet.NetworkLayer().NetworkFlow().Dst().String(),
+				SrcPort:   tcp.TransportFlow().Src().String(),
+				DstPort:   tcp.TransportFlow().Dst().String(),
+				Stream:    tcpStream,
+			}
+
 			rawStream := tcpStream.Data[dir]
 			rawStream.Data = append(rawStream.Data, data...)
 
-			nfs.DataArrieved(rawStream)
+			nfs.DataArrieved(rawStream, event, collector)
 		}
 	}
 }
