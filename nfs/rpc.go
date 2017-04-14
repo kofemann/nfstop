@@ -127,7 +127,7 @@ func DataArrieved(s *stream.Stream, event *stream.Event, l *list.List) {
 		}
 
 		size := int(marker & rpcSizeMask)
-		if size < len(s.Data)-4 {
+		if size > len(s.Data)-4 {
 			// not all data arraived
 			return
 		}
