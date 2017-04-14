@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"flag"
 	"fmt"
+	ui "github.com/gizak/termui"
 	"github.com/kofemann/nfstop/nfs"
 	"github.com/kofemann/nfstop/sniffer"
 	"github.com/kofemann/nfstop/stream"
@@ -73,67 +74,116 @@ func main() {
 
 	collector := list.New()
 
-	for {
-		select {
-		case <-ticker:
-			// time to refresh screen
-			l := collector
-			collector = list.New()
+	quit := make(chan int)
 
-			for e := l.Front(); e != nil; e = e.Next() {
-				r := e.Value.(*nfs.NfsRequest)
-				fmt.Println(r)
-			}
-
-		case packet := <-packets:
-			// A nil packet indicates the end of a pcap file.
-			if packet == nil {
-				os.Exit(0)
-			}
-			counter++
-			//		log.Println(packet)
-			if packet.NetworkLayer() == nil || packet.TransportLayer() == nil || packet.TransportLayer().LayerType() != layers.LayerTypeTCP {
-
-				continue
-			}
-
-			tcp := packet.TransportLayer().(*layers.TCP)
-
-			data := tcp.Payload
-			if len(data) == 0 {
-				continue
-			}
-
-			// direction independed unique connection identifier
-			connectionKey := fmt.Sprintf("%d:%d",
-				packet.NetworkLayer().NetworkFlow().FastHash(),
-				tcp.TransportFlow().FastHash(),
-			)
-
-			dir := 0
-			tcpStream, ok := streams[connectionKey]
-			if !ok {
-				tcpStream = stream.NewTcpStream(tcp)
-				streams[connectionKey] = tcpStream
-			} else {
-				if tcpStream.SrcPort != tcp.SrcPort {
-					dir = 1
-				}
-			}
-
-			event := &stream.Event{
-				Timestamp: packet.Metadata().CaptureInfo.Timestamp,
-				Src:       packet.NetworkLayer().NetworkFlow().Src().String(),
-				Dst:       packet.NetworkLayer().NetworkFlow().Dst().String(),
-				SrcPort:   tcp.TransportFlow().Src().String(),
-				DstPort:   tcp.TransportFlow().Dst().String(),
-				Stream:    tcpStream,
-			}
-
-			rawStream := tcpStream.Data[dir]
-			rawStream.Data = append(rawStream.Data, data...)
-
-			nfs.DataArrieved(rawStream, event, collector)
-		}
+	// UI
+	err = ui.Init()
+	if err != nil {
+		panic(err)
 	}
+	defer ui.Close()
+
+	ls := ui.NewList()
+	ls.ItemFgColor = ui.ColorYellow
+	ls.BorderLabel = "NFS packets"
+	ls.Height = ui.TermHeight()
+
+	ui.Body.Rows = make([]*ui.Row, 0)
+	ui.Body.AddRows(
+		ui.NewRow(
+			ui.NewCol(12, 0, ls),
+		),
+	)
+
+	go func() {
+		for {
+			select {
+			case <-quit:
+				return
+			case <-ticker:
+				// time to refresh screen
+				l := collector
+				collector = list.New()
+
+				s := make([]string, l.Len())
+				i := 0
+				for e := l.Front(); e != nil; e = e.Next() {
+					r := e.Value.(*nfs.NfsRequest)
+					s[i] = r.String()
+					i++
+				}
+
+				ls.Items = s
+				ui.Body.Align()
+				ui.Render(ui.Body)
+
+			case packet := <-packets:
+				// A nil packet indicates the end of a pcap file.
+				if packet == nil {
+					os.Exit(0)
+				}
+				counter++
+				//		log.Println(packet)
+				if packet.NetworkLayer() == nil || packet.TransportLayer() == nil || packet.TransportLayer().LayerType() != layers.LayerTypeTCP {
+
+					continue
+				}
+
+				tcp := packet.TransportLayer().(*layers.TCP)
+
+				data := tcp.Payload
+				if len(data) == 0 {
+					continue
+				}
+
+				// direction independed unique connection identifier
+				connectionKey := fmt.Sprintf("%d:%d",
+					packet.NetworkLayer().NetworkFlow().FastHash(),
+					tcp.TransportFlow().FastHash(),
+				)
+
+				dir := 0
+				tcpStream, ok := streams[connectionKey]
+				if !ok {
+					tcpStream = stream.NewTcpStream(tcp)
+					streams[connectionKey] = tcpStream
+				} else {
+					if tcpStream.SrcPort != tcp.SrcPort {
+						dir = 1
+					}
+				}
+
+				event := &stream.Event{
+					Timestamp: packet.Metadata().CaptureInfo.Timestamp,
+					Src:       packet.NetworkLayer().NetworkFlow().Src().String(),
+					Dst:       packet.NetworkLayer().NetworkFlow().Dst().String(),
+					SrcPort:   tcp.TransportFlow().Src().String(),
+					DstPort:   tcp.TransportFlow().Dst().String(),
+					Stream:    tcpStream,
+				}
+
+				rawStream := tcpStream.Data[dir]
+				rawStream.Data = append(rawStream.Data, data...)
+
+				nfs.DataArrieved(rawStream, event, collector)
+			}
+		}
+	}()
+
+	ui.Handle("/sys/kbd/q", func(ui.Event) {
+		ui.StopLoop()
+		quit <- 1
+	})
+
+	ui.Handle("/sys/wnd/resize", func(e ui.Event) {
+		ui.Body.Width = ui.TermWidth()
+		ui.Body.Align()
+		ui.Clear()
+		ui.Render(ui.Body)
+	})
+
+	ui.Body.Align()
+	ui.Render(ui.Body)
+
+	ui.Loop()
 }
