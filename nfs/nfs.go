@@ -38,6 +38,10 @@ func (nfs *NfsRequest) GetServer() string {
 	return nfs.server
 }
 
+func (nfs *NfsRequest) GetCred() string {
+	return nfs.auth
+}
+
 func (nfs *NfsRequest) getRequestInfo(xdr *xdr) {
 
 	switch nfs.vers {

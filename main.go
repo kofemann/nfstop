@@ -8,6 +8,7 @@ import (
 	"github.com/kofemann/nfstop/nfs"
 	"github.com/kofemann/nfstop/sniffer"
 	"github.com/kofemann/nfstop/stream"
+	"github.com/kofemann/nfstop/utils"
 	"github.com/tsg/gopacket"
 	"github.com/tsg/gopacket/layers"
 	"github.com/tsg/gopacket/pcap"
@@ -76,6 +77,26 @@ func main() {
 
 	quit := make(chan int)
 
+	// request selection
+
+	ByClient := func(r *nfs.NfsRequest) string {
+		return r.GetClient()
+	}
+
+	ByServer := func(r *nfs.NfsRequest) string {
+		return r.GetServer()
+	}
+
+	ByOpCode := func(r *nfs.NfsRequest) string {
+		return r.GetOpCode()
+	}
+
+	ByUser := func(r *nfs.NfsRequest) string {
+		return r.GetCred()
+	}
+
+	selection := ByClient
+
 	// UI
 	err = ui.Init()
 	if err != nil {
@@ -83,15 +104,33 @@ func main() {
 	}
 	defer ui.Close()
 
-	ls := ui.NewList()
-	ls.ItemFgColor = ui.ColorYellow
-	ls.BorderLabel = "NFS packets"
-	ls.Height = ui.TermHeight()
+	title := ui.NewPar(":PRESS q TO QUIT")
+	title.TextFgColor = ui.ColorWhite
+	title.BorderLabel = "NFS top"
+	title.BorderFg = ui.ColorCyan
+	title.Height = 3
+
+	labelList := ui.NewList()
+	labelList.Border = false
+	labelList.Height = ui.TermHeight()
+
+	histogramList := ui.NewList()
+	histogramList.Border = false
+	histogramList.Height = ui.TermHeight()
+
+	valuesList := ui.NewList()
+	valuesList.Border = false
+	valuesList.Height = ui.TermHeight()
 
 	ui.Body.Rows = make([]*ui.Row, 0)
 	ui.Body.AddRows(
 		ui.NewRow(
-			ui.NewCol(12, 0, ls),
+			ui.NewCol(12, 0, title),
+		),
+		ui.NewRow(
+			ui.NewCol(4, 0, labelList),
+			ui.NewCol(6, 0, histogramList),
+			ui.NewCol(2, 0, valuesList),
 		),
 	)
 
@@ -105,15 +144,22 @@ func main() {
 				l := collector
 				collector = list.New()
 
-				s := make([]string, l.Len())
-				i := 0
-				for e := l.Front(); e != nil; e = e.Next() {
-					r := e.Value.(*nfs.NfsRequest)
-					s[i] = r.String()
-					i++
+				term := utils.Aggr(l, selection)
+				sum := term.Sum()
+				labels := make([]string, l.Len())
+				histograms := make([]string, l.Len())
+				values := make([]string, l.Len())
+				size := (ui.TermWidth() / 12) * 8
+
+				for i, e := range term.Elements {
+					labels[i] = fmt.Sprintf("%8s", e.Key)
+					histograms[i] = utils.FillHisto(sum, e.Value, size)
+					values[i] = fmt.Sprintf("%8d", e.Value)
 				}
 
-				ls.Items = s
+				labelList.Items = labels
+				histogramList.Items = histograms
+				valuesList.Items = values
 				ui.Body.Align()
 				ui.Render(ui.Body)
 
@@ -169,6 +215,22 @@ func main() {
 			}
 		}
 	}()
+
+	ui.Handle("/sys/kbd/s", func(ui.Event) {
+		selection = ByServer
+	})
+
+	ui.Handle("/sys/kbd/o", func(ui.Event) {
+		selection = ByOpCode
+	})
+
+	ui.Handle("/sys/kbd/c", func(ui.Event) {
+		selection = ByClient
+	})
+
+	ui.Handle("/sys/kbd/u", func(ui.Event) {
+		selection = ByUser
+	})
 
 	ui.Handle("/sys/kbd/q", func(ui.Event) {
 		ui.StopLoop()
