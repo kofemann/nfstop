@@ -95,6 +95,7 @@ func main() {
 		return r.GetCred()
 	}
 
+	aggrName := "Client Endpoint"
 	selection := ByClient
 
 	// UI
@@ -104,33 +105,46 @@ func main() {
 	}
 	defer ui.Close()
 
-	title := ui.NewPar(":PRESS q TO QUIT")
-	title.TextFgColor = ui.ColorWhite
-	title.BorderLabel = "NFS top"
-	title.BorderFg = ui.ColorCyan
+	title := ui.NewPar("q: Quit, c/s: by clients/servers, o: by nfs ops, u: by user")
+	title.BorderFg = ui.ColorDefault
+	title.TextFgColor = ui.ColorDefault
 	title.Height = 3
+
+	status := ui.NewPar("Aggregate by: " + aggrName)
+	status.BorderFg = ui.ColorDefault
+	status.TextFgColor = ui.ColorDefault
+	status.Height = 3
+
+	lSize := ui.TermHeight() - (status.Height + title.Height)
 
 	labelList := ui.NewList()
 	labelList.Border = false
-	labelList.Height = ui.TermHeight()
+	labelList.Height = lSize
+	labelList.ItemFgColor = ui.ColorDefault
 
 	histogramList := ui.NewList()
 	histogramList.Border = false
-	histogramList.Height = ui.TermHeight()
+	histogramList.Height = lSize
+	histogramList.ItemFgColor = ui.ColorDefault
 
 	valuesList := ui.NewList()
 	valuesList.Border = false
-	valuesList.Height = ui.TermHeight()
+	valuesList.Height = lSize
+	valuesList.ItemFgColor = ui.ColorDefault
 
 	ui.Body.Rows = make([]*ui.Row, 0)
 	ui.Body.AddRows(
 		ui.NewRow(
 			ui.NewCol(12, 0, title),
 		),
+
 		ui.NewRow(
 			ui.NewCol(4, 0, labelList),
 			ui.NewCol(6, 0, histogramList),
 			ui.NewCol(2, 0, valuesList),
+		),
+		ui.NewRow(
+			ui.NewCol(12, 0, status),
 		),
 	)
 
@@ -146,10 +160,13 @@ func main() {
 
 				term := utils.Aggr(l, selection)
 				sum := term.Sum()
+
 				labels := make([]string, l.Len())
 				histograms := make([]string, l.Len())
 				values := make([]string, l.Len())
-				size := (ui.TermWidth() / 12) * 8
+				size := (ui.TermWidth() / 12) * 6
+
+				status.Text = "Aggregate by: " + aggrName
 
 				for i, e := range term.Elements {
 					labels[i] = fmt.Sprintf("%8s", e.Key)
@@ -218,18 +235,22 @@ func main() {
 
 	ui.Handle("/sys/kbd/s", func(ui.Event) {
 		selection = ByServer
+		aggrName = "Server Endpoint"
 	})
 
 	ui.Handle("/sys/kbd/o", func(ui.Event) {
 		selection = ByOpCode
+		aggrName = "NFS operation"
 	})
 
 	ui.Handle("/sys/kbd/c", func(ui.Event) {
 		selection = ByClient
+		aggrName = "Client Endpoint"
 	})
 
 	ui.Handle("/sys/kbd/u", func(ui.Event) {
 		selection = ByUser
+		aggrName = "User Credential"
 	})
 
 	ui.Handle("/sys/kbd/q", func(ui.Event) {
