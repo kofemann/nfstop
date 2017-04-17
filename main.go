@@ -13,6 +13,7 @@ import (
 	"github.com/tsg/gopacket/layers"
 	"github.com/tsg/gopacket/pcap"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -26,7 +27,7 @@ const (
 	// SNAPLEN packet snapshot length
 	SNAPLEN = 65535
 
-	REFRESH_TIME = time.Second * 2
+	REFRESH_TIME = 2
 )
 
 var streams = make(map[string]*stream.TcpStream)
@@ -71,7 +72,18 @@ func main() {
 	packets := packetSource.Packets()
 
 	counter := 0
-	ticker := time.Tick(REFRESH_TIME)
+
+	refreshTime := REFRESH_TIME
+	if len(flag.Args()) > 0 {
+
+		refreshTime, err = strconv.Atoi(flag.Arg(0))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Invalid time value: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	ticker := time.Tick(time.Second * time.Duration(refreshTime))
 
 	collector := list.New()
 
