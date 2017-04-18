@@ -4,6 +4,10 @@ import (
 	"container/list"
 	"flag"
 	"fmt"
+	"os"
+	"strconv"
+	"time"
+
 	ui "github.com/gizak/termui"
 	"github.com/kofemann/nfstop/nfs"
 	"github.com/kofemann/nfstop/sniffer"
@@ -12,9 +16,6 @@ import (
 	"github.com/tsg/gopacket"
 	"github.com/tsg/gopacket/layers"
 	"github.com/tsg/gopacket/pcap"
-	"os"
-	"strconv"
-	"time"
 )
 
 const (
@@ -73,17 +74,18 @@ func main() {
 
 	counter := 0
 
-	refreshTime := REFRESH_TIME
+	refreshValue := REFRESH_TIME
 	if len(flag.Args()) > 0 {
 
-		refreshTime, err = strconv.Atoi(flag.Arg(0))
+		refreshValue, err = strconv.Atoi(flag.Arg(0))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Invalid time value: %v\n", err)
 			os.Exit(1)
 		}
 	}
 
-	ticker := time.Tick(time.Second * time.Duration(refreshTime))
+	refreshTime := time.Second * time.Duration(refreshValue)
+	ticker := time.Tick(refreshTime)
 
 	collector := list.New()
 
@@ -122,7 +124,7 @@ func main() {
 	title.TextFgColor = ui.ColorDefault
 	title.Height = 3
 
-	status := ui.NewPar("Aggregate by: " + aggrName)
+	status := ui.NewPar(fmt.Sprintf("Aggregate every %v by: %s", refreshTime, aggrName))
 	status.BorderFg = ui.ColorDefault
 	status.TextFgColor = ui.ColorDefault
 	status.Height = 3
@@ -178,7 +180,7 @@ func main() {
 				values := make([]string, l.Len())
 				size := (ui.TermWidth() / 12) * 6
 
-				status.Text = "Aggregate by: " + aggrName
+				status.Text = fmt.Sprintf("Aggregate every %v by: %s", refreshTime, aggrName)
 
 				for i, e := range term.Elements {
 					labels[i] = fmt.Sprintf("%s", e.Key)

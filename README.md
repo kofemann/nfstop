@@ -3,6 +3,9 @@ NFS-top
 
 Top like utility to show nfs traffic utilization
 
+
+![alt screenshot](_screenshots/ss-by-op.png)
+
 HowTo build
 -----------
 
