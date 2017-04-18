@@ -181,7 +181,7 @@ func main() {
 				status.Text = "Aggregate by: " + aggrName
 
 				for i, e := range term.Elements {
-					labels[i] = fmt.Sprintf("%8s", e.Key)
+					labels[i] = fmt.Sprintf("%s", e.Key)
 					histograms[i] = utils.FillHisto(sum, e.Value, size)
 					values[i] = fmt.Sprintf("%8d", e.Value)
 				}
