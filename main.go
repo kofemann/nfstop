@@ -271,6 +271,11 @@ func main() {
 	})
 
 	ui.Handle("/sys/wnd/resize", func(e ui.Event) {
+		lSize = ui.TermHeight() - (status.Height + title.Height)
+		labelList.Height = lSize
+		histogramList.Height = lSize
+		valuesList.Height = lSize
+
 		ui.Body.Width = ui.TermWidth()
 		ui.Body.Align()
 		ui.Clear()
