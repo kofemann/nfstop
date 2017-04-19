@@ -1,16 +1,10 @@
 package sniffer
 
 import (
-	"github.com/tsg/gopacket"
 	"time"
-	//	"github.com/tsg/gopacket/layers"
+
 	"github.com/tsg/gopacket/pcap"
 )
-
-// Worker callback handler
-type Worker interface {
-	OnPacket(data []byte, ci *gopacket.CaptureInfo)
-}
 
 // Sniffer packet sniffer configuration
 type Sniffer struct {
