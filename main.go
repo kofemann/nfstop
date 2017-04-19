@@ -205,43 +205,20 @@ func main() {
 					continue
 				}
 
-				tcp := packet.TransportLayer().(*layers.TCP)
-
-				data := tcp.Payload
-				if len(data) == 0 {
-					continue
-				}
-
 				// direction independed unique connection identifier
+				tcp := packet.TransportLayer().(*layers.TCP)
 				connectionKey := fmt.Sprintf("%d:%d",
 					packet.NetworkLayer().NetworkFlow().FastHash(),
 					tcp.TransportFlow().FastHash(),
 				)
 
-				dir := 0
 				rpcStream, ok := streams[connectionKey]
 				if !ok {
 					rpcStream = nfs.NewRpcStream(tcp)
 					streams[connectionKey] = rpcStream
-				} else {
-					if rpcStream.SrcPort != tcp.SrcPort {
-						dir = 1
-					}
 				}
 
-				event := &nfs.StreamEvent{
-					Timestamp: packet.Metadata().CaptureInfo.Timestamp,
-					Src:       packet.NetworkLayer().NetworkFlow().Src().String(),
-					Dst:       packet.NetworkLayer().NetworkFlow().Dst().String(),
-					SrcPort:   tcp.TransportFlow().Src().String(),
-					DstPort:   tcp.TransportFlow().Dst().String(),
-					Stream:    rpcStream,
-				}
-
-				rawStream := rpcStream.Data[dir]
-				rawStream.Data = append(rawStream.Data, data...)
-
-				nfs.DataArrieved(rawStream, event, collector)
+				collector.PushBackList(rpcStream.PacketArrieved(packet))
 			}
 		}
 	}()
