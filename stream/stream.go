@@ -1,32 +1,33 @@
 package stream
 
 import (
+	"time"
+
 	"github.com/patrickmn/go-cache"
 	"github.com/tsg/gopacket/layers"
-	"time"
 )
 
 type Stream struct {
 	Data []byte
 }
 
-type TcpStream struct {
+type RpcStream struct {
 	SrcPort, DstPort layers.TCPPort
 	Dir              int
 	Data             [](*Stream)
-	Cache            *cache.Cache
+	PendingRequests  *cache.Cache
 }
 
-func NewTcpStream(tcp *layers.TCP) *TcpStream {
+func NewRpcStream(tcp *layers.TCP) *RpcStream {
 
 	in := Stream{Data: make([]byte, 0)}
 	out := Stream{Data: make([]byte, 0)}
 	c := cache.New(time.Minute*2, time.Minute*5)
 	d := [](*Stream){&in, &out}
-	return &TcpStream{Dir: 0,
-		SrcPort: tcp.SrcPort,
-		DstPort: tcp.DstPort,
-		Data:    d,
-		Cache:   c,
+	return &RpcStream{Dir: 0,
+		SrcPort:         tcp.SrcPort,
+		DstPort:         tcp.DstPort,
+		Data:            d,
+		PendingRequests: c,
 	}
 }

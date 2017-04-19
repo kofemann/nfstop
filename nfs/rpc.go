@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"encoding/binary"
 	"fmt"
+
 	"github.com/kofemann/nfstop/stream"
 )
 
@@ -19,7 +20,7 @@ const (
 
 const nfsProgramNumber = 100003
 
-func handleCall(xid string, xdr *xdr, event *stream.Event) {
+func handleCall(xid string, xdr *xdr, event *stream.StreamEvent) {
 
 	// eat rpc version number
 	xdr.getUInt()
@@ -74,14 +75,14 @@ func handleCall(xid string, xdr *xdr, event *stream.Event) {
 
 	r.getRequestInfo(xdr)
 
-	event.Stream.Cache.SetDefault(xid, r)
+	event.Stream.PendingRequests.SetDefault(xid, r)
 }
 
-func handleReply(xid string, xdr *xdr, event *stream.Event, l *list.List) {
+func handleReply(xid string, xdr *xdr, event *stream.StreamEvent, l *list.List) {
 
 	var r *NfsRequest
-	if x, ok := event.Stream.Cache.Get(xid); ok {
-		event.Stream.Cache.Delete(xid)
+	if x, ok := event.Stream.PendingRequests.Get(xid); ok {
+		event.Stream.PendingRequests.Delete(xid)
 		r = x.(*NfsRequest)
 		r.rtime = event.Timestamp
 
@@ -95,7 +96,7 @@ func handleReply(xid string, xdr *xdr, event *stream.Event, l *list.List) {
 	}
 }
 
-func procesRpcMessage(xdr *xdr, event *stream.Event, l *list.List) {
+func procesRpcMessage(xdr *xdr, event *stream.StreamEvent, l *list.List) {
 
 	xid := fmt.Sprintf("%.8x", xdr.getUInt())
 	msgType := xdr.getUInt()
@@ -110,7 +111,7 @@ func procesRpcMessage(xdr *xdr, event *stream.Event, l *list.List) {
 	}
 }
 
-func DataArrieved(s *stream.Stream, event *stream.Event, l *list.List) {
+func DataArrieved(s *stream.Stream, event *stream.StreamEvent, l *list.List) {
 
 	for len(s.Data) > 0 {
 

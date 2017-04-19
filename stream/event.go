@@ -5,16 +5,16 @@ import (
 	"time"
 )
 
-type Event struct {
+type StreamEvent struct {
 	Timestamp time.Time
 	Src       string
 	Dst       string
 	SrcPort   string
 	DstPort   string
-	Stream    *TcpStream
+	Stream    *RpcStream
 }
 
-func (e *Event) String() string {
+func (e *StreamEvent) String() string {
 	return fmt.Sprintf("%v %s:%s -> %s:%s",
 		e.Timestamp,
 		e.Src,

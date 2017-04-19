@@ -31,7 +31,7 @@ const (
 	REFRESH_TIME = 2
 )
 
-var streams = make(map[string]*stream.TcpStream)
+var streams = make(map[string]*stream.RpcStream)
 
 var iface = flag.String("i", ANY_DEVICE, "name of `interface` to listen")
 var filter = flag.String("f", NFS_FILTER, "capture `filter` in libpcap filter syntax")
@@ -220,26 +220,26 @@ func main() {
 				)
 
 				dir := 0
-				tcpStream, ok := streams[connectionKey]
+				rpcStream, ok := streams[connectionKey]
 				if !ok {
-					tcpStream = stream.NewTcpStream(tcp)
-					streams[connectionKey] = tcpStream
+					rpcStream = stream.NewRpcStream(tcp)
+					streams[connectionKey] = rpcStream
 				} else {
-					if tcpStream.SrcPort != tcp.SrcPort {
+					if rpcStream.SrcPort != tcp.SrcPort {
 						dir = 1
 					}
 				}
 
-				event := &stream.Event{
+				event := &stream.StreamEvent{
 					Timestamp: packet.Metadata().CaptureInfo.Timestamp,
 					Src:       packet.NetworkLayer().NetworkFlow().Src().String(),
 					Dst:       packet.NetworkLayer().NetworkFlow().Dst().String(),
 					SrcPort:   tcp.TransportFlow().Src().String(),
 					DstPort:   tcp.TransportFlow().Dst().String(),
-					Stream:    tcpStream,
+					Stream:    rpcStream,
 				}
 
-				rawStream := tcpStream.Data[dir]
+				rawStream := rpcStream.Data[dir]
 				rawStream.Data = append(rawStream.Data, data...)
 
 				nfs.DataArrieved(rawStream, event, collector)
