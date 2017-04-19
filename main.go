@@ -12,7 +12,6 @@ import (
 	"github.com/kofemann/nfstop/nfs"
 	"github.com/kofemann/nfstop/sniffer"
 	"github.com/kofemann/nfstop/utils"
-	"github.com/tsg/gopacket"
 	"github.com/tsg/gopacket/layers"
 	"github.com/tsg/gopacket/pcap"
 )
@@ -60,18 +59,11 @@ func main() {
 		Snaplen:   *snaplen,
 	}
 
-	handle, err := sniffer.Init()
+	packets, err := sniffer.Start()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize sniffer: %v\n", err)
 		os.Exit(1)
 	}
-
-	// Read in packets, pass to assembler.
-
-	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
-	packets := packetSource.Packets()
-
-	counter := 0
 
 	refreshValue := REFRESH_TIME
 	if len(flag.Args()) > 0 {
@@ -198,9 +190,9 @@ func main() {
 				if packet == nil {
 					os.Exit(0)
 				}
-				counter++
-				//		log.Println(packet)
-				if packet.NetworkLayer() == nil || packet.TransportLayer() == nil || packet.TransportLayer().LayerType() != layers.LayerTypeTCP {
+
+				if packet.NetworkLayer() == nil || packet.TransportLayer() == nil ||
+					packet.TransportLayer().LayerType() != layers.LayerTypeTCP {
 
 					continue
 				}

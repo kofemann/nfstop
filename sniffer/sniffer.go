@@ -3,6 +3,7 @@ package sniffer
 import (
 	"time"
 
+	"github.com/tsg/gopacket"
 	"github.com/tsg/gopacket/pcap"
 )
 
@@ -19,8 +20,8 @@ type Sniffer struct {
 	Snaplen int
 }
 
-// Init initialize sniffer
-func (sniffer *Sniffer) Init() (*pcap.Handle, error) {
+// Start start packet sniffer
+func (sniffer *Sniffer) Start() (chan gopacket.Packet, error) {
 
 	handle, err := pcap.OpenLive(
 		sniffer.Interface,
@@ -35,5 +36,6 @@ func (sniffer *Sniffer) Init() (*pcap.Handle, error) {
 		return nil, err
 	}
 
-	return handle, nil
+	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+	return packetSource.Packets(), nil
 }
