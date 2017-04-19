@@ -11,7 +11,6 @@ import (
 	ui "github.com/gizak/termui"
 	"github.com/kofemann/nfstop/nfs"
 	"github.com/kofemann/nfstop/sniffer"
-	"github.com/kofemann/nfstop/stream"
 	"github.com/kofemann/nfstop/utils"
 	"github.com/tsg/gopacket"
 	"github.com/tsg/gopacket/layers"
@@ -31,7 +30,7 @@ const (
 	REFRESH_TIME = 2
 )
 
-var streams = make(map[string]*stream.RpcStream)
+var streams = make(map[string]*nfs.RpcStream)
 
 var iface = flag.String("i", ANY_DEVICE, "name of `interface` to listen")
 var filter = flag.String("f", NFS_FILTER, "capture `filter` in libpcap filter syntax")
@@ -222,7 +221,7 @@ func main() {
 				dir := 0
 				rpcStream, ok := streams[connectionKey]
 				if !ok {
-					rpcStream = stream.NewRpcStream(tcp)
+					rpcStream = nfs.NewRpcStream(tcp)
 					streams[connectionKey] = rpcStream
 				} else {
 					if rpcStream.SrcPort != tcp.SrcPort {
@@ -230,7 +229,7 @@ func main() {
 					}
 				}
 
-				event := &stream.StreamEvent{
+				event := &nfs.StreamEvent{
 					Timestamp: packet.Metadata().CaptureInfo.Timestamp,
 					Src:       packet.NetworkLayer().NetworkFlow().Src().String(),
 					Dst:       packet.NetworkLayer().NetworkFlow().Dst().String(),
