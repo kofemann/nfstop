@@ -124,6 +124,10 @@ func EnablePidTracing() {
 					return
 				}
 				xid := strings.Split(trace.Event, " ")[1][6:]
+				l := len(xid)
+				if l < 8 {
+					xid = strings.Repeat("0", 8-l) + xid
+				}
 				xidCache.SetDefault(xid, trace.Pid)
 			}
 		}

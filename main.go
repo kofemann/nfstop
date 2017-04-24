@@ -5,10 +5,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 	"strconv"
 	"time"
-
-	"runtime"
 
 	ui "github.com/gizak/termui"
 	"github.com/kofemann/nfstop/nfs"
