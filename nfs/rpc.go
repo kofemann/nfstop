@@ -67,6 +67,8 @@ func handleCall(xid string, xdr *xdr, event *StreamEvent) {
 		ctime:  event.Timestamp,
 		client: event.Src + ":" + event.SrcPort,
 		server: event.Dst + ":" + event.DstPort,
+		pid:    -1,
+		xid:    xid,
 	}
 
 	r.getRequestInfo(xdr)

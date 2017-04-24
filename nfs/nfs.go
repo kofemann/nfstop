@@ -16,6 +16,8 @@ type NfsRequest struct {
 	ctime  time.Time
 	client string
 	server string
+	pid    int
+	xid    string
 }
 
 func (nfs *NfsRequest) GetOpCode() string {
@@ -39,6 +41,9 @@ func (nfs *NfsRequest) GetServer() string {
 }
 
 func (nfs *NfsRequest) GetCred() string {
+	if nfs.pid != -1 {
+		return fmt.Sprintf("%s (%d)", nfs.auth, nfs.pid)
+	}
 	return nfs.auth
 }
 
@@ -70,8 +75,8 @@ func (nfs *NfsRequest) getNFSReplyStatus(xdr *xdr) string {
 }
 
 func (nfs *NfsRequest) String() string {
-	return fmt.Sprintf("%s -> %s %s v%d.%d op: %s, srt: %v",
-		nfs.client, nfs.server,
+	return fmt.Sprintf("%s -> %s %s %s v%d.%d op: %s, srt: %v",
+		nfs.client, nfs.server, nfs.xid,
 		nfs.auth,
 		nfs.vers, nfs.minor, nfs.opcode,
 		nfs.rtime.Sub(nfs.ctime),

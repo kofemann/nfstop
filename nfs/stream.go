@@ -35,7 +35,7 @@ func NewRpcStream(tcp *layers.TCP) *RpcStream {
 	}
 }
 
-func (rs *RpcStream) PacketArrieved(packet gopacket.Packet) *list.List {
+func (rs *RpcStream) PacketArrieved(packet gopacket.Packet, xidCache *cache.Cache) *list.List {
 
 	l := list.New()
 	tcp := packet.TransportLayer().(*layers.TCP)
@@ -87,6 +87,10 @@ func (rs *RpcStream) PacketArrieved(packet gopacket.Packet) *list.List {
 
 		r := procesRpcMessage(xdr, event)
 		if r != nil {
+			pid, ok := xidCache.Get(r.xid)
+			if ok {
+				r.pid = pid.(int)
+			}
 			l.PushBack(r)
 		}
 

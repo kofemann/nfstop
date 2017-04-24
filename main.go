@@ -6,14 +6,18 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	ui "github.com/gizak/termui"
+	"github.com/kofemann/linux_ftrace"
 	"github.com/kofemann/nfstop/nfs"
 	"github.com/kofemann/nfstop/sniffer"
 	"github.com/kofemann/nfstop/utils"
+	"github.com/patrickmn/go-cache"
 	"github.com/tsg/gopacket/layers"
 	"github.com/tsg/gopacket/pcap"
+	"runtime"
 )
 
 const (
@@ -35,6 +39,7 @@ var iface = flag.String("i", ANY_DEVICE, "name of `interface` to listen")
 var filter = flag.String("f", NFS_FILTER, "capture `filter` in libpcap filter syntax")
 var listInterfaces = flag.Bool("D", false, "print list of interfaces and exit")
 var snaplen = flag.Int("s", SNAPLEN, "packet `snaplen` - snapshot length")
+var trackPid = flag.Bool("P", false, "Try to match requests to local PIDs")
 
 func main() {
 
@@ -153,7 +158,22 @@ func main() {
 		),
 	)
 
+	var eventTrace *ftrace.EventTrace
+	var pidSource chan ftrace.Trace
+	if *trackPid && runtime.GOOS == "linux" {
+		eventTrace = ftrace.NewEventTrace("sunrpc/xprt_transmit")
+		eventTrace.Enable()
+
+		pidSource = eventTrace.EventSource()
+	} else {
+		// dummy channel
+		pidSource = make(chan ftrace.Trace, 1)
+	}
+	defer eventTrace.Disable()
+	xidCache := cache.New(time.Minute*1, time.Minute*1)
+
 	go func() {
+
 		for {
 			select {
 			case <-quit:
@@ -185,6 +205,10 @@ func main() {
 				ui.Body.Align()
 				ui.Render(ui.Body)
 
+			case trace := <-pidSource:
+				xid := strings.Split(trace.Event, " ")[1][6:]
+				xidCache.SetDefault(xid, trace.Pid)
+
 			case packet := <-packets:
 				// A nil packet indicates the end of a pcap file.
 				if packet == nil {
@@ -210,7 +234,7 @@ func main() {
 					streams[connectionKey] = rpcStream
 				}
 
-				collector.PushBackList(rpcStream.PacketArrieved(packet))
+				collector.PushBackList(rpcStream.PacketArrieved(packet, xidCache))
 			}
 		}
 	}()
