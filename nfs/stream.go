@@ -91,6 +91,7 @@ func (rs *RpcStream) PacketArrieved(packet gopacket.Packet) *list.List {
 		if r != nil {
 			pid, ok := xidCache.Get(r.xid)
 			if ok {
+				xidCache.Delete(r.xid)
 				r.pid = pid.(int)
 			}
 			l.PushBack(r)
