@@ -3,8 +3,10 @@ package nfs
 import (
 	"container/list"
 	"encoding/binary"
+	"strings"
 	"time"
 
+	ftrace "github.com/kofemann/linux_ftrace"
 	"github.com/patrickmn/go-cache"
 	"github.com/tsg/gopacket"
 	"github.com/tsg/gopacket/layers"
@@ -35,7 +37,7 @@ func NewRpcStream(tcp *layers.TCP) *RpcStream {
 	}
 }
 
-func (rs *RpcStream) PacketArrieved(packet gopacket.Packet, xidCache *cache.Cache) *list.List {
+func (rs *RpcStream) PacketArrieved(packet gopacket.Packet) *list.List {
 
 	l := list.New()
 	tcp := packet.TransportLayer().(*layers.TCP)
@@ -98,4 +100,37 @@ func (rs *RpcStream) PacketArrieved(packet gopacket.Packet, xidCache *cache.Cach
 	}
 
 	return l
+}
+
+var xidCache = cache.New(time.Minute*1, time.Minute*1)
+
+var enablePidTracing = false
+var pidSource chan ftrace.Trace
+var eventTrace *ftrace.EventTrace
+
+func EnablePidTracing() {
+
+	enablePidTracing = true
+	eventTrace = ftrace.NewEventTrace("sunrpc/xprt_transmit")
+	eventTrace.Enable()
+
+	pidSource = eventTrace.EventSource()
+	go func() {
+		for {
+			select {
+			case trace, ok := <-pidSource:
+				if !ok {
+					return
+				}
+				xid := strings.Split(trace.Event, " ")[1][6:]
+				xidCache.SetDefault(xid, trace.Pid)
+			}
+		}
+	}()
+}
+
+func DisablePidTracing() {
+	if enablePidTracing {
+		eventTrace.Disable()
+	}
 }

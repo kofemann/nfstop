@@ -6,18 +6,16 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
+	"runtime"
+
 	ui "github.com/gizak/termui"
-	"github.com/kofemann/linux_ftrace"
 	"github.com/kofemann/nfstop/nfs"
 	"github.com/kofemann/nfstop/sniffer"
 	"github.com/kofemann/nfstop/utils"
-	"github.com/patrickmn/go-cache"
 	"github.com/tsg/gopacket/layers"
 	"github.com/tsg/gopacket/pcap"
-	"runtime"
 )
 
 const (
@@ -158,19 +156,10 @@ func main() {
 		),
 	)
 
-	var eventTrace *ftrace.EventTrace
-	var pidSource chan ftrace.Trace
 	if *trackPid && runtime.GOOS == "linux" {
-		eventTrace = ftrace.NewEventTrace("sunrpc/xprt_transmit")
-		eventTrace.Enable()
-
-		pidSource = eventTrace.EventSource()
-	} else {
-		// dummy channel
-		pidSource = make(chan ftrace.Trace, 1)
+		nfs.EnablePidTracing()
 	}
-	defer eventTrace.Disable()
-	xidCache := cache.New(time.Minute*1, time.Minute*1)
+	defer nfs.DisablePidTracing()
 
 	go func() {
 
@@ -205,10 +194,6 @@ func main() {
 				ui.Body.Align()
 				ui.Render(ui.Body)
 
-			case trace := <-pidSource:
-				xid := strings.Split(trace.Event, " ")[1][6:]
-				xidCache.SetDefault(xid, trace.Pid)
-
 			case packet := <-packets:
 				// A nil packet indicates the end of a pcap file.
 				if packet == nil {
@@ -234,7 +219,7 @@ func main() {
 					streams[connectionKey] = rpcStream
 				}
 
-				collector.PushBackList(rpcStream.PacketArrieved(packet, xidCache))
+				collector.PushBackList(rpcStream.PacketArrieved(packet))
 			}
 		}
 	}()
