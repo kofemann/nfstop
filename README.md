@@ -14,6 +14,7 @@ Pull the dependencies
 $ go get -u github.com/gizak/termui
 $ go get -u github.com/tsg/gopacket
 $ go get -u github.com/patrickmn/go-cache
+$ go get -u github.com/kofemann/linux_ftrace
 ```
 
 And build:
